@@ -557,8 +557,8 @@ footer .logo{font-size:24px;color:var(--fg)}
       const from = this.fwdTime(), target = this.REST[to], forward = to > this.step, len = Math.abs(target - from), jump = Math.abs(to - this.step) > 1;
       this.step = to; this.ui();
       if (reduced) { this.jumpTo(to); return; }
-      // slow & smooth: 0.45–0.6x speed on 60fps footage; multi-step jumps go a bit faster
-      const rate = jump ? Math.max(.6, len / 4) : Math.min(.6, Math.max(.45, len / 2.6));
+      // playback speed: 0.7–0.85x of the 60fps footage (smooth, a little slower than real time)
+      const rate = jump ? Math.max(.9, len / 3) : Math.min(.85, Math.max(.7, len / 2));
       this.animating = true;
       this.playSeg(forward, from, target, rate, () => { this.animating = false; this.lastEnd = performance.now(); page.lastEnd = this.lastEnd; this.park(); this.scheduleIdle(); });
     }
