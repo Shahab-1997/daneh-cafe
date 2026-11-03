@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Scroll Menu Film</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Vazirmatn:wght@400;500&display=swap">
+<style>
+/* Layout: one full-screen canvas; each scroll/swipe plays exactly one page turn, from the flip until the dish is fully shown. Single dark look. */
+:root{--bg:#070605;--gold:#c9a45c;--gold-hi:#ecd49b;--text:#efe6d6;--muted:#9b8f7c;color-scheme:dark}
+html,body{height:100%;background:var(--bg)}
+body{margin:0;color:var(--text);font-family:'Vazirmatn',Tahoma,sans-serif;direction:rtl;overflow:hidden;overscroll-behavior:none}
+.stage{position:fixed;inset:0;overflow:hidden;background:var(--bg);touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{display:block;width:100%;height:100%}
+#prices{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.price{position:absolute;left:0;top:0;opacity:0;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 22px 9px;border:1px solid rgba(201,164,92,.7);outline:1px solid rgba(201,164,92,.35);outline-offset:3px;background:rgba(10,8,6,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);white-space:nowrap;will-change:opacity,transform}
+.price b{font-size:clamp(17px,4.6vw,24px);font-weight:500;color:var(--gold-hi);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.price span{font-size:clamp(10px,2.6vw,12px);color:var(--gold);letter-spacing:.08em}
+.dots{position:absolute;top:50%;right:max(10px,env(safe-area-inset-right,0px));transform:translateY(-50%);display:flex;flex-direction:column;gap:10px;z-index:3}
+.dots button{width:14px;height:14px;border:0;background:none;padding:0;cursor:pointer;display:grid;place-items:center}
+.dots button i{width:6px;height:6px;border-radius:50%;background:rgba(201,164,92,.35);transition:all .3s}
+.dots button[aria-current="true"] i{width:8px;height:8px;background:var(--gold);box-shadow:0 0 8px var(--gold)}
+.dots button:focus-visible{outline:2px solid var(--gold-hi);border-radius:50%}
+.hint{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);display:flex;flex-direction:column;align-items:center;gap:6px;font-size:14px;color:var(--text);text-shadow:0 2px 10px #000;transition:opacity .5s;pointer-events:none}
+.hint svg{width:22px;height:22px;color:var(--gold);animation:nudge 1.5s ease-in-out infinite}
+@keyframes nudge{50%{transform:translateX(-7px)}}
+.hint.gone{opacity:0}
+.loader{position:absolute;inset:0;display:grid;place-items:center;align-content:center;gap:14px;background:var(--bg);transition:opacity .5s;font-size:14px;color:var(--muted);z-index:5}
+.loader.gone{opacity:0;pointer-events:none}
+.loader .ring{width:160px;height:2px;background:rgba(201,164,92,.18);overflow:hidden}
+.loader .ring i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+.toc{position:absolute;left:0;top:0;opacity:0;pointer-events:none;display:flex;flex-direction:column;align-items:center;font-size:calc(var(--fw) * .01)}
+.toc.live{pointer-events:auto}
+.toc h2{margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;font-size:7.4em;letter-spacing:.04em;color:#e2c486;text-shadow:0 0 1.4em rgba(201,164,92,.35);line-height:1}
+.toc .orn{width:26em;height:2.4em;color:var(--gold);margin:.6em 0 4.4em}
+.toc button{display:flex;align-items:baseline;gap:1.8em;width:44em;padding:2.2em 1em;border:0;border-bottom:1px solid rgba(201,164,92,.28);background:none;color:var(--text);cursor:pointer;font:inherit;text-align:right;transition:background .25s}
+.toc button:first-of-type{border-top:1px solid rgba(201,164,92,.28)}
+.toc button:hover,.toc button:focus-visible{background:rgba(201,164,92,.08);outline:none}
+.toc .fa{font-family:'Vazirmatn',Tahoma,sans-serif;font-weight:500;font-size:4.6em;color:#ecd49b}
+.toc .ln{flex:1;border-bottom:1px dotted rgba(201,164,92,.5);transform:translateY(-.5em)}
+.toc .en{font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-weight:500;font-size:3.6em;color:var(--gold);direction:ltr}
+.back{position:absolute;left:0;top:0;z-index:4;display:flex;align-items:center;gap:7px;padding:9px 15px 9px 13px;border:1px solid rgba(201,164,92,.75);outline:1px solid rgba(201,164,92,.3);outline-offset:3px;background:rgba(10,8,6,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);color:var(--gold-hi);font:500 13.5px 'Vazirmatn',Tahoma,sans-serif;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .4s}
+.back.show{opacity:1;pointer-events:auto}
+.back svg{width:16px;height:16px;color:var(--gold)}
+.back:hover,.back:focus-visible{background:rgba(201,164,92,.16);outline-color:var(--gold)}
+@media (prefers-reduced-motion:reduce){.hint svg{animation:none}}
+</style>
+
+<div class="stage" id="stage">
+  <canvas id="cv" aria-label="منوی رستوران که با اسکرول ورق می‌خورد"></canvas>
+  <div id="prices"></div>
+  <div class="toc" id="toc" dir="rtl">
+    <h2 dir="ltr">Menu</h2>
+    <svg class="orn" viewBox="0 0 120 10" fill="none" stroke="currentColor" stroke-width=".8"><path d="M0 5 H48 M72 5 H120"/><path d="M52 5 Q56 0 60 5 Q64 10 68 5 Q64 0 60 5 Q56 10 52 5Z"/></svg>
+    <button data-go="Nutella Shake"><span class="fa">نوشیدنی‌ها</span><span class="ln"></span><span class="en">Drinks</span></button>
+    <button data-go="Croissant"><span class="fa">غذاها</span><span class="ln"></span><span class="en">Food</span></button>
+  </div>
+  <button class="back" id="back" aria-label="بازگشت به فهرست منو"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>بازگشت به منو</button>
+  <nav class="dots" id="dots" aria-label="صفحه‌های منو"></nav>
+  <div class="hint" id="hint"><span>برای ورق زدن، صفحه را به چپ بکشید</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg></div>
+  <div class="loader" id="loader"><span>در حال بارگذاری منو…</span><div class="ring"><i id="lp"></i></div></div>
+</div>
+
+<script>
+const COUNT = 345;
+const FPS = 22; // playback speed of one page turn (frames per second)
+// Resting points: the cover, then each dish once its page is fully shown. One scroll = move to the next one.
+const STOPS = [
+  { frame: 1,   label: 'جلد' },
+  { frame: 14,  label: 'فهرست', toc: true },
+  { frame: 45,  label: 'Croissant',      price: 120000, from: 27 },
+  { frame: 78,  label: 'Danish',         price: 145000, from: 56 },
+  { frame: 105, label: 'Cinnamon Roll',  price: 135000, from: 88 },
+  { frame: 136, label: 'Pastry',         price: 165000, from: 115 },
+  { frame: 167, label: 'Signature Cake', price: 210000, from: 147 },
+  { frame: 197, label: 'Ghormeh Sabzi',  price: 285000, from: 182, priceY: 0.83 },
+  { frame: 250, label: 'Nutella Shake',  price: 165000, from: 212, priceY: 0.86 },
+  { frame: 294, label: 'Espresso',       price: 75000,  from: 265, priceY: 0.86 },
+  { frame: 345, label: 'Cappuccino',     price: 110000, from: 308, priceY: 0.86 },
+];
+const PRICE_Y = 0.795; // spot under the dish, as a share of frame height
+
+const src = i => `frames/f${String(i + 1).padStart(3, '0')}.jpg`;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const frames = new Array(COUNT);
+let loaded = 0, cur = 0, target = 0, drawn = -1, stop = 0, geo = null, last = 0;
+
+function size() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.round(cv.clientWidth * dpr);
+  cv.height = Math.round(cv.clientHeight * dpr);
+  drawn = -1;
+}
+function nearestLoaded(i) {
+  for (let d = 0; d < COUNT; d++) {
+    for (const j of [i - d, i + d]) { const f = frames[j]; if (f && f.complete && f.naturalWidth) return f; }
+  }
+  return null;
+}
+function draw(i) {
+  const img = nearestLoaded(i); if (!img) return;
+  const W = cv.width, H = cv.height, iw = img.naturalWidth, ih = img.naturalHeight;
+  const portrait = W / H < 0.8;
+  ctx.fillStyle = '#070605'; ctx.fillRect(0, 0, W, H);
+  if (!portrait) {
+    const sb = Math.max(W / iw, H / ih);
+    ctx.save(); ctx.filter = 'blur(40px) brightness(.45)';
+    ctx.drawImage(img, (W - iw * sb) / 2, (H - ih * sb) / 2, iw * sb, ih * sb);
+    ctx.restore();
+  }
+  const s = portrait ? Math.max(W / iw, H / ih) : Math.min(W / iw, H / ih);
+  ctx.drawImage(img, (W - iw * s) / 2, (H - ih * s) / 2, iw * s, ih * s);
+  const k = cv.clientWidth / W;
+  geo = { x: (W / 2) * k, top: ((H - ih * s) / 2) * k, h: ih * s * k, left: ((W - iw * s) / 2) * k, w: iw * s * k };
+}
+
+/* prices */
+const priceEls = STOPS.map(st => {
+  if (!st.price) return null;
+  const el = document.createElement('div'); el.className = 'price';
+  el.innerHTML = `<b>${st.price.toLocaleString('fa-IR')}</b><span>تومان</span>`;
+  document.getElementById('prices').appendChild(el); return el;
+});
+function placePrices(f) {
+  if (!geo) return;
+  STOPS.forEach((st, i) => {
+    const el = priceEls[i]; if (!el) return;
+    const next = STOPS[i + 1];
+    const a = st.from - 1, b = next ? next.from - 1 - 8 : COUNT + 10, fade = 4;
+    const o = Math.max(0, Math.min((f - a) / fade, (b - f) / fade, 1));
+    el.style.opacity = o.toFixed(3);
+    el.style.transform = `translate(${geo.x}px,${geo.top + geo.h * (st.priceY || PRICE_Y)}px) translate(-50%,-50%) translateY(${((1 - o) * 10).toFixed(1)}px)`;
+  });
+}
+
+/* categories page (shown on the blank page right after the cover opens) */
+const toc = document.getElementById('toc');
+const TOC_STOP = STOPS.findIndex(s => s.toc), TOC_F = STOPS[TOC_STOP].frame - 1;
+function placeToc(f) {
+  if (!geo) return;
+  const o = Math.max(0, 1 - Math.abs(f - TOC_F) / 2.5);
+  toc.style.opacity = o.toFixed(3);
+  toc.style.setProperty('--fw', geo.w + 'px');
+  toc.style.transform = `translate(${geo.left + geo.w * .525}px,${geo.top + geo.h * .34}px) translate(-50%,0) translateY(${((1 - o) * 12).toFixed(1)}px)`;
+  toc.classList.toggle('live', o > .95 && stop === TOC_STOP);
+}
+toc.addEventListener('click', e => {
+  const b = e.target.closest('[data-go]'); if (!b || busy()) return;
+  goStop(STOPS.findIndex(s => s.label === b.dataset.go));
+});
+['touchstart', 'touchend'].forEach(t => toc.addEventListener(t, e => e.stopPropagation(), { passive: true }));
+
+/* back-to-menu button, pinned to the bottom corner of the video frame */
+const backBtn = document.getElementById('back');
+function placeBack(f) {
+  if (!geo) return;
+  const vw = cv.clientWidth, vh = cv.clientHeight;
+  const right = Math.min(geo.left + geo.w, vw), bottom = Math.min(geo.top + geo.h, vh);
+  const bw = backBtn.offsetWidth, bh = backBtn.offsetHeight;
+  backBtn.style.transform = `translate(${right - bw - 16}px,${bottom - bh - 18}px)`;
+  backBtn.classList.toggle('show', f > TOC_F + 3);
+}
+backBtn.addEventListener('click', () => goStop(TOC_STOP));
+['touchstart', 'touchend'].forEach(t => backBtn.addEventListener(t, e => e.stopPropagation(), { passive: true }));
+
+/* dots */
+const dotsEl = document.getElementById('dots');
+const dotBtns = STOPS.map((st, i) => {
+  const b = document.createElement('button');
+  b.setAttribute('aria-label', st.label); b.innerHTML = '<i></i>';
+  b.onclick = () => goStop(i);
+  dotsEl.appendChild(b); return b;
+});
+function markDots() { dotBtns.forEach((b, i) => b.setAttribute('aria-current', i === stop)); }
+
+/* playback: frames advance at FPS toward the target stop, forward or backward */
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function tick(t) {
+  const dt = last ? Math.min(0.05, (t - last) / 1000) : 0; last = t;
+  if (cur !== target) {
+    const dist = target - cur, speed = FPS * (Math.abs(dist) > 40 ? Math.max(2.2, Math.abs(dist) / 18) : 1);
+    const step = reduce ? Math.abs(dist) : speed * dt;
+    cur = Math.abs(dist) <= step ? target : cur + Math.sign(dist) * step;
+  }
+  const i = Math.round(cur);
+  if (i !== drawn) { draw(i); drawn = i; }
+  placePrices(cur); placeToc(cur); placeBack(cur);
+  requestAnimationFrame(tick);
+}
+const busy = () => Math.abs(target - cur) > 0.5;
+function goStop(i) {
+  i = Math.max(0, Math.min(STOPS.length - 1, i));
+  if (i === stop && !busy()) return;
+  stop = i; target = STOPS[i].frame - 1; markDots();
+  document.getElementById('hint').classList.add('gone');
+}
+function step(dir) { if (!busy()) goStop(stop + dir); }
+
+/* input: one gesture = one page */
+let lastWheel = 0, wheelSum = 0, gestureUsed = false;
+addEventListener('wheel', e => {
+  e.preventDefault();
+  const now = performance.now();
+  if (now - lastWheel > 220) { wheelSum = 0; gestureUsed = false; } // a pause means a new gesture
+  lastWheel = now;
+  if (gestureUsed) return;
+  wheelSum += e.deltaY;
+  if (Math.abs(wheelSum) > 30 && !busy()) { step(Math.sign(wheelSum)); gestureUsed = true; }
+}, { passive: false });
+let ty = null, tx = null;
+const stage = document.getElementById('stage');
+stage.addEventListener('touchstart', e => { ty = e.touches[0].clientY; tx = e.touches[0].clientX; }, { passive: true });
+stage.addEventListener('touchmove', e => { e.preventDefault(); }, { passive: false });
+stage.addEventListener('touchend', e => {
+  if (ty === null) return;
+  const dy = ty - e.changedTouches[0].clientY, dx = tx - e.changedTouches[0].clientX; ty = tx = null;
+  // pages turn right-to-left: drag toward the left = next page, toward the right = previous
+  if (Math.abs(dx) >= Math.abs(dy) && Math.abs(dx) > 35) step(dx > 0 ? 1 : -1);
+  else if (Math.abs(dy) > 35) step(dy > 0 ? 1 : -1);
+});
+addEventListener('keydown', e => {
+  if (['ArrowDown', 'ArrowLeft', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); step(1); }
+  if (['ArrowUp', 'ArrowRight', 'PageUp'].includes(e.key)) { e.preventDefault(); step(-1); }
+});
+
+/* loading */
+function load(i) {
+  return new Promise(res => {
+    const im = new Image(); im.decoding = 'async';
+    im.onload = im.onerror = () => { loaded++; document.getElementById('lp').style.width = (loaded / COUNT * 100) + '%'; res(); };
+    im.src = src(i); frames[i] = im;
+  });
+}
+(async () => {
+  size(); await load(0); drawn = -1;
+  const rest = []; for (let i = 1; i < COUNT; i++) rest.push(i);
+  const workers = Array.from({ length: 6 }, async () => { while (rest.length) await load(rest.shift()); });
+  await Promise.race([Promise.all(workers), new Promise(r => setTimeout(r, 3000))]);
+  document.getElementById('loader').classList.add('gone');
+  await Promise.all(workers); drawn = -1;
+})();
+addEventListener('resize', size);
+markDots(); requestAnimationFrame(tick);
+</script>
+
+</html>
